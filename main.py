@@ -15,7 +15,7 @@ def generate_variants(email, count):
         local, domain = email.split("@")
         domain = domain.lower()
         results = set()
-        max_attempts = count * 10
+        max_attempts = count * 6
         attempts = 0
         while len(results) < count and attempts < max_attempts:
             attempts += 1
@@ -49,15 +49,18 @@ def get_gen_30_interface(chat_id):
         else:
             return "✅ <b>All Gmails Processed!</b>\nনতুন করে জিমেইল পাঠান।", main_menu()
 
-    text = (f"🎯 <b>Active:</b> {current_base}\n"
-            f"📊 <b>Queue:</b> {current_idx + 1}/{len(state['email_list'])}\n"
-            f"📧 <b>Remaining: {len(variants)}</b>\n\n"
-            f"<i>নিচের বাটনে ক্লিক করলে কপি মেসেজ আসবে এবং লিস্ট থেকে মুছে যাবে।</i>")
+    text = (
+        f"⚡ <b>GMAIL GENERATOR</b>\n\n"
+        f"📌 <b>Current:</b> <code>{current_base}</code>\n"
+        f"📊 <b>Progress:</b> {current_idx + 1}/{len(state['email_list'])}\n"
+        f"📦 <b>Left:</b> {len(variants)} variants\n\n"
+        f"👇 <i>Click any below to copy instantly</i>"
+    )
     
     markup = types.InlineKeyboardMarkup(row_width=1)
     # ১০টি করে ভ্যারিয়েন্ট বাটন দেখাবে যাতে স্ক্রিন বড় না হয়
     for i, mail in enumerate(variants[:10]):
-        markup.add(types.InlineKeyboardButton(mail, callback_data=f"take_{mail}"))
+        markup.add(types.InlineKeyboardButton(f"📧 {mail}", callback_data=f"take_{mail}"))
     
     # অতিরিক্ত কন্ট্রোল বাটন
     controls = []
@@ -82,7 +85,13 @@ def handle_callbacks(call):
     
     if call.data == "mode_30":
         user_data[chat_id] = {'mode': '30'}
-        bot.edit_message_text("📨 <b>GMAIL GEN 30 MODE</b>\n\nআপনি একসাথে ১ থেকে ৬টি জিমেইল দিতে পারেন।\n(জিমেইলগুলো স্পেস বা এন্টার দিয়ে আলাদা করে দিন)", chat_id, call.message.message_id)
+        bot.edit_message_text(
+    "📨 <b>GMAIL GEN MODE (30)</b>\n\n"
+    "⚡ একসাথে ১–১০টা Gmail দিতে পারেন\n"
+    "📩 Space বা Enter দিয়ে আলাদা করে GMAIL Send করেন\n\n",
+    chat_id,
+    call.message.message_id
+)
     
     elif call.data == "mode_10k":
         user_data[chat_id] = {'mode': '10k'}
@@ -164,13 +173,13 @@ def handle_text(message):
 
     # --- Mode 30 Logic ---
     if state['mode'] == '30':
-        emails = [e.strip() for e in message.text.replace('\n', ' ').split(' ') if '@' in e][:6]
+        emails = [e.strip() for e in message.text.replace('\n', ' ').split(' ') if '@' in e][:10]
         if not emails:
             bot.reply_to(message, "❌ সঠিক জিমেইল ফরম্যাট দিন!")
             return
         
         loading = bot.send_message(chat_id, "📧 <b>Processing Gmails...</b>")
-        time.sleep(1)
+        # remove completely (no need)
         
         state['email_list'] = emails
         state['current_index'] = 0
@@ -189,7 +198,7 @@ def handle_text(message):
             return
         
         m1 = bot.send_message(chat_id, "📧 <b>Creating new account...</b>")
-        time.sleep(1)
+        # remove completely (no need)
         bot.edit_message_text("⏳ <b>Please wait... generating 10K variants</b>", chat_id, m1.message_id)
         
         variants = generate_variants(email, 10000)
