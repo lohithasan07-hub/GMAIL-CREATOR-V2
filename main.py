@@ -4,8 +4,12 @@ import io
 import os
 import time
 from telebot import types
+from dotenv import load_dotenv
+load_dotenv()
 
-API_TOKEN = os.getenv("BOT_TOKEN", "8338478408:AAEV3otptv8Udec344Pnj3n_57exdMy1KwU")
+API_TOKEN = os.getenv("BOT_TOKEN")
+if not API_TOKEN:
+    raise ValueError("BOT_TOKEN not set!")
 bot = telebot.TeleBot(API_TOKEN, parse_mode="HTML")
 
 user_data = {}
