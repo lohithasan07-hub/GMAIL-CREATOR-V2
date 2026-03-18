@@ -57,7 +57,7 @@ def get_gen_30_interface(chat_id):
     markup = types.InlineKeyboardMarkup(row_width=1)
     # ১০টি করে ভ্যারিয়েন্ট বাটন দেখাবে যাতে স্ক্রিন বড় না হয়
     for i, mail in enumerate(variants[:10]):
-        markup.add(types.InlineKeyboardButton(mail, callback_data=f"take_{i}"))
+        markup.add(types.InlineKeyboardButton(mail, callback_data=f"take_{mail}"))
     
     # অতিরিক্ত কন্ট্রোল বাটন
     controls = []
@@ -107,24 +107,52 @@ def handle_callbacks(call):
 
     elif call.data.startswith("take_"):
         state = user_data.get(chat_id)
-        idx = int(call.data.split("_")[1])
-        current_base = state['email_list'][state['current_index']]
-        
-        # ১. আগের মেসেজ ডিলিট
-        if state.get('last_copy_id'):
-            try: bot.delete_message(chat_id, state['last_copy_id'])
-            except: pass
-        
-        # ২. ভ্যারিয়েন্ট রিমুভ ও পাঠানো
-        selected = state['variants_dict'][current_base].pop(idx)
-        sent = bot.send_message(chat_id, f"<code>{selected}</code>")
-        state['last_copy_id'] = sent.message_id
-        
-        # ৩. ইন্টারফেস আপডেট
-        text, markup = get_gen_30_interface(chat_id)
-        bot.edit_message_text(text, chat_id, call.message.message_id, reply_markup=markup)
-        bot.answer_callback_query(call.id, "Copied!")
 
+        if not state:
+            bot.answer_callback_query(call.id, "❌ Session expired")
+            return
+
+        # 🔒 LOCK (anti double click)
+        if state.get("busy"):
+            bot.answer_callback_query(call.id, "⏳ Wait...")
+            return
+        state["busy"] = True
+
+        try:
+            bot.answer_callback_query(call.id, "⚡ Sending...")
+            selected_mail = call.data.replace("take_", "")
+            current_base = state['email_list'][state['current_index']]
+            variants_list = state['variants_dict'][current_base]
+
+            # ❌ already removed
+            if selected_mail not in variants_list:
+                bot.answer_callback_query(call.id, "❌ Already taken")
+                state["busy"] = False
+                return
+            # 🧹 delete previous
+            if state.get('last_copy_id'):
+                try:
+                    bot.delete_message(chat_id, state['last_copy_id'])
+                except:
+                    pass
+
+            # ✅ SAFE REMOVE
+            variants_list.remove(selected_mail)
+
+            sent = bot.send_message(chat_id, f"<code>{selected_mail}</code>")
+            state['last_copy_id'] = sent.message_id
+
+            # 🔄 UI refresh
+            text, markup = get_gen_30_interface(chat_id)
+            bot.edit_message_text(text, chat_id, call.message.message_id, reply_markup=markup)
+
+
+        except Exception as e:
+            bot.answer_callback_query(call.id, "❌ Error")
+
+        finally:
+            state["busy"] = False
+      
 @bot.message_handler(func=lambda m: True)
 def handle_text(message):
     chat_id = message.chat.id
