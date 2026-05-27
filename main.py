@@ -5,7 +5,7 @@ import os
 import time
 from telebot import types
 
-API_TOKEN = "8338478408:AAHrsgbA-qBatU6wmAD2MImRRg-zoAROuEY"
+API_TOKEN = "8338478408:AAFVJj269a9a7AeW5Ccc_Zbwt_T4qi0kgC8"
 bot = telebot.TeleBot(API_TOKEN, parse_mode="HTML")
 
 user_data = {}
