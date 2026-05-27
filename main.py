@@ -5,7 +5,7 @@ import os
 import time
 from telebot import types
 
-API_TOKEN = "8338478408:AAFVJj269a9a7AeW5Ccc_Zbwt_T4qi0kgC8"
+API_TOKEN = "8338478408:AAH1UbxlUs8s9ria4Xsfq3G2hDPwNtiDt5A"
 bot = telebot.TeleBot(API_TOKEN, parse_mode="HTML")
 
 user_data = {}
@@ -36,11 +36,11 @@ def get_gen_30_interface(chat_id):
     state = user_data.get(chat_id)
     if not state or not state['email_list']:
         return "❌ No Emails Found!", None
-
+    
     current_idx = state['current_index']
     current_base = state['email_list'][current_idx]
     variants = state['variants_dict'][current_base]
-
+    
     if not variants:
         # যদি এই জিমেইলের সব শেষ হয়ে যায়, অটো নেক্সট জিমেইল চেক করবে
         if current_idx + 1 < len(state['email_list']):
@@ -56,33 +56,33 @@ def get_gen_30_interface(chat_id):
         f"📦 <b>Left:</b> {len(variants)} variants\n\n"
         f"👇 <i>Click any below to copy instantly</i>"
     )
-
+    
     markup = types.InlineKeyboardMarkup(row_width=1)
     # ১০টি করে ভ্যারিয়েন্ট বাটন দেখাবে যাতে স্ক্রিন বড় না হয়
     for i, mail in enumerate(variants[:10]):
         markup.add(types.InlineKeyboardButton(f"📧 {mail}", callback_data=f"take_{mail}"))
-
+    
     # অতিরিক্ত কন্ট্রোল বাটন
     controls = []
     if len(state['email_list']) > 1:
         controls.append(types.InlineKeyboardButton("🔄 Switch Gmail", callback_data="switch_menu"))
-
+    
     controls.append(types.InlineKeyboardButton("🔝 Main Menu", callback_data="back_to_main"))
     markup.add(*controls)
-
+    
     return text, markup
 
 @bot.message_handler(commands=['start'])
 def start_cmd(message):
-    welcome_text = ("🎉 <b>EMAIL VARIANT CREATOR BOT ACTIVE</b> 🤖\n\n"
+    welcome_text = ("🎉 <b>EMAIL VARIANT 6.9 BOT ACTIVE</b> 🤖\n\n"
                     "💥 <b>Created By</b> @Lohit_69💎\n\n"
-                    "📥 <b>SEND  EMAIL ADDRESS:</b>")
+                    "📥 <b>SEND AN EMAIL ADDRESS:</b>")
     bot.send_message(message.chat.id, welcome_text, reply_markup=main_menu())
 
 @bot.callback_query_handler(func=lambda c: True)
 def handle_callbacks(call):
     chat_id = call.message.chat.id
-
+    
     if call.data == "mode_30":
         user_data[chat_id] = {'mode': '30'}
         bot.edit_message_text(
@@ -92,7 +92,7 @@ def handle_callbacks(call):
     chat_id,
     call.message.message_id
 )
-
+    
     elif call.data == "mode_10k":
         user_data[chat_id] = {'mode': '10k'}
         bot.edit_message_text("📦 <b>GMAIL GEN 10K MODE</b>\n\nযেকোনো ১টি জিমেইল পাঠান। আমি ১০,০০০ ভ্যারিয়েন্ট ফাইল করে দিচ্ছি।", chat_id, call.message.message_id)
@@ -121,14 +121,14 @@ def handle_callbacks(call):
             bot.answer_callback_query(call.id, "❌ Session expired")
             return
 
-        now = time.time()
-
-        if now - state.get("last_click", 0) < 0.4:
+        # 🔒 LOCK (anti double click)
+        if state.get("busy"):
+            bot.answer_callback_query(call.id, "⏳ Wait...")
             return
+        state["busy"] = True
 
-        state["last_click"] = now
         try:
-            bot.answer_callback_query(call.id)
+            bot.answer_callback_query(call.id, "⚡ Sending...")
             selected_mail = call.data.replace("take_", "")
             current_base = state['email_list'][state['current_index']]
             variants_list = state['variants_dict'][current_base]
@@ -159,11 +159,14 @@ def handle_callbacks(call):
         except Exception as e:
             bot.answer_callback_query(call.id, "❌ Error")
 
+        finally:
+            state["busy"] = False
+      
 @bot.message_handler(func=lambda m: True)
 def handle_text(message):
     chat_id = message.chat.id
     state = user_data.get(chat_id)
-
+    
     if not state or 'mode' not in state:
         bot.reply_to(message, "আগে নিচ থেকে একটি মোড সিলেক্ট করুন 👇", reply_markup=main_menu())
         return
@@ -174,15 +177,15 @@ def handle_text(message):
         if not emails:
             bot.reply_to(message, "❌ সঠিক জিমেইল ফরম্যাট দিন!")
             return
-
+        
         loading = bot.send_message(chat_id, "📧 <b>Processing Gmails...</b>")
         # remove completely (no need)
-
+        
         state['email_list'] = emails
         state['current_index'] = 0
         state['variants_dict'] = {e: generate_variants(e, 30) for e in emails}
         state['last_copy_id'] = None
-
+        
         bot.delete_message(chat_id, loading.message_id)
         text, markup = get_gen_30_interface(chat_id)
         bot.send_message(chat_id, text, reply_markup=markup)
@@ -193,18 +196,29 @@ def handle_text(message):
         if "@" not in email:
             bot.reply_to(message, "❌ Invalid Email!")
             return
-
+        
         m1 = bot.send_message(chat_id, "📧 <b>Creating new account...</b>")
         # remove completely (no need)
         bot.edit_message_text("⏳ <b>Please wait... generating 10K variants</b>", chat_id, m1.message_id)
-
+        
         variants = generate_variants(email, 10000)
         file_buffer = io.BytesIO("\n".join(variants).encode('utf-8'))
         file_buffer.name = f"10K_{email.split('@')[0]}.txt"
-
+        
         bot.edit_message_text("✅ <b>Account generated successfully!</b>", chat_id, m1.message_id)
         bot.send_document(chat_id, file_buffer, caption=f"🎯 Target: {email}\n📦 Total: 10,000", reply_markup=main_menu())
 
 if __name__ == "__main__":
     print("Bot is starting...")
-    bot.infinity_polling()
+
+    while True:
+        try:
+            bot.infinity_polling(
+                timeout=30,
+                long_polling_timeout=30,
+                skip_pending=True
+            )
+
+        except Exception as e:
+            print(f"Error: {e}")
+            time.sleep(5)
