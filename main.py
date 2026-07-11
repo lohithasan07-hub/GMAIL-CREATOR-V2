@@ -9,11 +9,11 @@ bot = telebot.TeleBot(API_TOKEN, parse_mode="HTML")
 
 user_data = {}
 
-# অন-দ্য-ফ্লাই জেনারেশন ফাংশন (মেমরি সাশ্রয়ী)
+# অন-দ্য-ফ্লাই জেনারেশন ফাংশন (মেমরি সাশ্রয়ী)
 def generate_single_variant(email):
     try:
         local, domain = email.split("@")
-        domain = domain.lower()
+        domain = domain.lower()  # ডোমেইন সব সময় লোয়ারকেস থাকবে
         new_local = "".join(random.choice([c.lower(), c.upper()]) if c.isalpha() else c for c in local)
         return f"{new_local}@{domain}"
     except: return email
@@ -35,9 +35,10 @@ def get_gen_30_interface(chat_id):
     current_idx = state['current_index']
     current_base = state['email_list'][current_idx]
     
+    # ছবির মতো প্রো লেআউট
     text = (
         f"⚡ <b>GMAIL GENERATOR (On-The-Fly)</b>\n\n"
-        f"📌 <b>Current:</b> <code>{current_base}</code>\n"
+        f"📌 <b>Current:</b>\n<code>{current_base}</code>\n"
         f"📊 <b>Progress:</b> {current_idx + 1}/{len(state['email_list'])}\n\n"
         f"👇 <i>Click to generate a variant</i>"
     )
@@ -69,6 +70,12 @@ def handle_callbacks(call):
     if call.data == "reset_bot":
         user_data.pop(chat_id, None)
         bot.answer_callback_query(call.id, "✅ Session Reset!")
+        bot.delete_message(chat_id, call.message.message_id)
+        start_cmd(call.message)
+        return
+
+    if call.data == "back_to_main":
+        bot.delete_message(chat_id, call.message.message_id)
         start_cmd(call.message)
         return
 
@@ -87,17 +94,27 @@ def handle_callbacks(call):
         
         state["busy"] = True
         try:
+            # ✨ AUTO-DELETE LOGIC ✨
+            if state.get('last_msg_id'):
+                try: bot.delete_message(chat_id, state['last_msg_id'])
+                except: pass
+
             email_base = state['email_list'][state['current_index']]
             new_mail = generate_single_variant(email_base)
             bot.answer_callback_query(call.id, "✅ Generated!")
-            bot.send_message(chat_id, f"<code>{new_mail}</code>")
+            
+            # নতুন মেসেজ সেন্ড এবং তার আইডি সেভ
+            sent = bot.send_message(chat_id, f"<code>{new_mail}</code>")
+            state['last_msg_id'] = sent.message_id
         finally:
             state["busy"] = False
 
     elif call.data == "switch_menu":
         markup = types.InlineKeyboardMarkup(row_width=1)
         for i, email in enumerate(state['email_list']):
-            markup.add(types.InlineKeyboardButton(f"{'📍 ' if i == state['current_index'] else ''}{email}", callback_data=f"set_idx_{i}"))
+            # এক্টিভ জিমেইলের পাশে সুন্দর আইকন
+            prefix = "🟢 " if i == state['current_index'] else "⚪ "
+            markup.add(types.InlineKeyboardButton(f"{prefix}{email}", callback_data=f"set_idx_{i}"))
         bot.edit_message_text("🔍 Select:", chat_id, call.message.message_id, reply_markup=markup)
 
     elif call.data.startswith("set_idx_"):
@@ -117,7 +134,9 @@ def handle_text(message):
     if state['mode'] == '30':
         emails = [e.strip() for e in message.text.split() if '@' in e][:10]
         if not emails: return
-        state.update({'email_list': emails, 'current_index': 0})
+        
+        # 'last_msg_id' ইনিশিয়ালাইজ করা হলো যাতে ডিলিট সিস্টেম কাজ করে
+        state.update({'email_list': emails, 'current_index': 0, 'last_msg_id': None})
         text, markup = get_gen_30_interface(chat_id)
         bot.send_message(chat_id, text, reply_markup=markup)
 
