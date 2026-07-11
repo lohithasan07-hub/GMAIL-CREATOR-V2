@@ -7,34 +7,27 @@ from telebot import types
 API_TOKEN = "8338478408:AAH1UbxlUs8s9ria4Xsfq3G2hDPwNtiDt5A"
 bot = telebot.TeleBot(API_TOKEN, parse_mode="HTML")
 
+# 🔴 REPLACE THIS WITH YOUR HOSTED HTML LINK (e.g., GitHub Pages URL)
+WEB_APP_URL = "https://yourusername.github.io/menu.html" 
+
 user_data = {}
 
-# অন-দ্য-ফ্লাই জেনারেশন ফাংশন (মেমরি সাশ্রয়ী)
 def generate_single_variant(email):
     try:
         local, domain = email.split("@")
-        domain = domain.lower()  # ডোমেইন সব সময় লোয়ারকেস থাকবে
+        domain = domain.lower()  
         new_local = "".join(random.choice([c.lower(), c.upper()]) if c.isalpha() else c for c in local)
         return f"{new_local}@{domain}"
     except: return email
 
-def main_menu():
-    markup = types.InlineKeyboardMarkup(row_width=1)
-    markup.add(
-        types.InlineKeyboardButton("📨 Gmail GEN  [ 30 ]", callback_data="mode_30"),
-        types.InlineKeyboardButton("📦 Gmail GEN  [ 10K ]", callback_data="mode_10k")
-    )
-    return markup
-
 def get_gen_30_interface(chat_id):
     state = user_data.get(chat_id)
     if not state or not state.get('email_list'):
-        return "❌ No Emails Found!", main_menu()
+        return "❌ No Emails Found!", None
     
     current_idx = state['current_index']
     current_base = state['email_list'][current_idx]
     
-    # 🌟 BOLD PROFESSIONAL HUD LAYOUT 🌟
     text = (
         f"<b>⚡ GMAIL GENERATOR ENGINE ⚡</b>\n"
         f"━━━━━━━━━━━━━━━━━━━━━━\n"
@@ -52,52 +45,56 @@ def get_gen_30_interface(chat_id):
     if len(state['email_list']) > 1:
         markup.add(types.InlineKeyboardButton("🔄 Switch Target Account", callback_data="switch_menu"))
     
-    markup.add(types.InlineKeyboardButton("🌐 Main Menu", callback_data="back_to_main"))
-    
     return text, markup
 
 @bot.message_handler(commands=['start'])
 def start_cmd(message):
     user_data.pop(message.chat.id, None)
+    
+    # 🌟 THIS IS THE WEB APP BUTTON (Located at the bottom of the chat)
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    markup.add(types.KeyboardButton("🎨 Open Pro Menu", web_app=types.WebAppInfo(url=WEB_APP_URL)))
+
     welcome_text = (
         "<b>💥 EMAIL VARIANT 6.9 💥</b>\n"
         "━━━━━━━━━━━━━━━━━━━━━━\n"
         "👑 <b>Dev:</b> @Lohit_69\n"
         "🟢 <b>System:</b> ONLINE\n"
         "━━━━━━━━━━━━━━━━━━━━━━\n"
-        "📥 <i>Select an operation mode:</i>"
+        "👇 <i>Tap the button below to open the interface:</i>"
     )
-    bot.send_message(message.chat.id, welcome_text, reply_markup=main_menu())
+    bot.send_message(message.chat.id, welcome_text, reply_markup=markup)
 
-@bot.callback_query_handler(func=lambda c: True)
-def handle_callbacks(call):
-    chat_id = call.message.chat.id
-    state = user_data.get(chat_id)
+# 🌟 CATCHES THE DATA SENT FROM YOUR HTML BUTTONS
+@bot.message_handler(content_types=['web_app_data'])
+def handle_webapp_data(message):
+    chat_id = message.chat.id
+    data = message.web_app_data.data # This will be 'mode_30' or 'mode_10k'
 
-    if call.data == "back_to_main":
-        bot.delete_message(chat_id, call.message.message_id)
-        start_cmd(call.message)
-        return
-
-    if call.data == "mode_30":
+    if data == "mode_30":
         user_data[chat_id] = {'mode': '30', 'email_list': []}
         text = (
             "<b>📨 GMAIL GEN MODE [30]</b>\n"
             "━━━━━━━━━━━━━━━━━━━━━━\n"
             "📝 <i>Send 1 to 10 Gmails (separated by space):</i>"
         )
-        bot.edit_message_text(text, chat_id, call.message.message_id)
+        bot.send_message(chat_id, text, reply_markup=types.ReplyKeyboardRemove()) # Removes the big button
     
-    elif call.data == "mode_10k":
+    elif data == "mode_10k":
         user_data[chat_id] = {'mode': '10k'}
         text = (
             "<b>📦 GMAIL GEN MODE [10K]</b>\n"
             "━━━━━━━━━━━━━━━━━━━━━━\n"
             "📝 <i>Send 1 target Gmail. I will output a 10,000 variant file.</i>"
         )
-        bot.edit_message_text(text, chat_id, call.message.message_id)
+        bot.send_message(chat_id, text, reply_markup=types.ReplyKeyboardRemove())
 
-    elif call.data == "take_variant":
+@bot.callback_query_handler(func=lambda c: True)
+def handle_callbacks(call):
+    chat_id = call.message.chat.id
+    state = user_data.get(chat_id)
+
+    if call.data == "take_variant":
         if not state or state.get("busy"):
             bot.answer_callback_query(call.id, "⏳ Generating...", show_alert=False)
             return
@@ -143,7 +140,7 @@ def handle_text(message):
     state = user_data.get(chat_id)
     
     if not state:
-        bot.reply_to(message, "⚠️ <b>Select a mode first.</b> 👇", reply_markup=main_menu())
+        bot.reply_to(message, "⚠️ <b>Type /start to open the Pro Menu first.</b> 👇")
         return
 
     if state['mode'] == '30':
@@ -160,12 +157,16 @@ def handle_text(message):
         variants = [generate_single_variant(message.text.strip()) for _ in range(10000)]
         file_buffer = io.BytesIO("\n".join(variants).encode('utf-8'))
         
-        # Dynamically name the file based on the target email
         prefix = message.text.strip().split('@')[0]
         file_buffer.name = f"10K_{prefix}.txt"
         
         bot.delete_message(chat_id, wait_msg.message_id)
         bot.send_document(chat_id, file_buffer, caption="<b>✅ GENERATION COMPLETE</b>\n━━━━━━━━━━━━━━━━━━━━━━\n🎯 Dev: @Lohit_69")
+        
+        # Bring the web app button back after generating
+        markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+        markup.add(types.KeyboardButton("🎨 Open Pro Menu", web_app=types.WebAppInfo(url=WEB_APP_URL)))
+        bot.send_message(chat_id, "<i>Ready for another generation.</i>", reply_markup=markup)
 
 if __name__ == "__main__":
     print("System Online...")
