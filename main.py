@@ -9,11 +9,11 @@ bot = telebot.TeleBot(API_TOKEN, parse_mode="HTML")
 
 user_data = {}
 
-# অন-দ্য-ফ্লাই জেনারেশন ফাংশন (মেমরি সাশ্রয়ী)
+# On-the-fly Generation (Memory Efficient)
 def generate_single_variant(email):
     try:
         local, domain = email.split("@")
-        domain = domain.lower()  # ডোমেইন সব সময় লোয়ারকেস থাকবে
+        domain = domain.lower()
         new_local = "".join(random.choice([c.lower(), c.upper()]) if c.isalpha() else c for c in local)
         return f"{new_local}@{domain}"
     except: return email
@@ -21,9 +21,8 @@ def generate_single_variant(email):
 def main_menu():
     markup = types.InlineKeyboardMarkup(row_width=1)
     markup.add(
-        types.InlineKeyboardButton("🟩 📨 Gmail GEN - ⚡30", callback_data="mode_30"),
-        types.InlineKeyboardButton("🟦 📦 Gmail GEN - ⚡ 10K", callback_data="mode_10k"),
-        types.InlineKeyboardButton("🟥 🔄 Reset Session", callback_data="reset_bot")
+        types.InlineKeyboardButton("📨 Gmail GEN - ⚡ 30", callback_data="mode_30"),
+        types.InlineKeyboardButton("📦 Gmail GEN - ⚡ 10K", callback_data="mode_10k")
     )
     return markup
 
@@ -35,7 +34,7 @@ def get_gen_30_interface(chat_id):
     current_idx = state['current_index']
     current_base = state['email_list'][current_idx]
     
-    # 🌟 FULL BOX IN MESSAGE (Using Blockquote & Code tags for Pro Look)
+    # 🌟 Professional HUD Layout
     text = (
         f"<blockquote>⚡ <b>GMAIL GENERATOR ENGINE</b>\n\n"
         f"📌 <b>Target Account:</b>\n"
@@ -46,18 +45,12 @@ def get_gen_30_interface(chat_id):
     )
     
     markup = types.InlineKeyboardMarkup(row_width=1)
-    
-    # 🌟 COLORFUL PRO BUTTONS (Simulating your second image layout)
-    markup.add(types.InlineKeyboardButton("🟩 📧 Generate Variant", callback_data="take_variant"))
+    markup.add(types.InlineKeyboardButton("📧 Generate Variant", callback_data="take_variant"))
     
     if len(state['email_list']) > 1:
-        markup.add(types.InlineKeyboardButton("🟦 🔄 Switch Gmail Account", callback_data="switch_menu"))
+        markup.add(types.InlineKeyboardButton("🔄 Switch Gmail Account", callback_data="switch_menu"))
     
-    # Bottom row with two buttons side-by-side for a compact control panel
-    markup.row(
-        types.InlineKeyboardButton("🌐 Main Menu", callback_data="back_to_main"),
-        types.InlineKeyboardButton("🟥 Reset", callback_data="reset_bot")
-    )
+    markup.add(types.InlineKeyboardButton("🌐 Main Menu", callback_data="back_to_main"))
     
     return text, markup
 
@@ -75,13 +68,6 @@ def start_cmd(message):
 def handle_callbacks(call):
     chat_id = call.message.chat.id
     state = user_data.get(chat_id)
-
-    if call.data == "reset_bot":
-        user_data.pop(chat_id, None)
-        bot.answer_callback_query(call.id, "✅ Session completely reset!", show_alert=True)
-        bot.delete_message(chat_id, call.message.message_id)
-        start_cmd(call.message)
-        return
 
     if call.data == "back_to_main":
         bot.delete_message(chat_id, call.message.message_id)
@@ -111,7 +97,6 @@ def handle_callbacks(call):
         
         state["busy"] = True
         try:
-            # ✨ AUTO-DELETE LOGIC ✨
             if state.get('last_msg_id'):
                 try: bot.delete_message(chat_id, state['last_msg_id'])
                 except: pass
@@ -119,10 +104,8 @@ def handle_callbacks(call):
             email_base = state['email_list'][state['current_index']]
             new_mail = generate_single_variant(email_base)
             
-            # Show top notification like Pro Bots
             bot.answer_callback_query(call.id, "✅ Variant Copied to Chat!")
             
-            # নতুন মেসেজ সেন্ড এবং তার আইডি সেভ
             sent = bot.send_message(chat_id, f"<code>{new_mail}</code>")
             state['last_msg_id'] = sent.message_id
         finally:
@@ -134,7 +117,6 @@ def handle_callbacks(call):
             prefix = "🟢 " if i == state['current_index'] else "⚪ "
             markup.add(types.InlineKeyboardButton(f"{prefix}{email}", callback_data=f"set_idx_{i}"))
         
-        # Back button added to switch menu
         markup.add(types.InlineKeyboardButton("🔙 Back to HUD", callback_data=f"set_idx_{state['current_index']}"))
         bot.edit_message_text("<blockquote>🔍 <b>Select Account:</b></blockquote>", chat_id, call.message.message_id, reply_markup=markup)
 
@@ -158,9 +140,7 @@ def handle_text(message):
         
         state.update({'email_list': emails, 'current_index': 0, 'last_msg_id': None})
         
-        # Delete user's message to keep chat clean (Pro feel)
-        try: bot.delete_message(chat_id, message.message_id)
-        except: pass
+        # User message deletion removed! Your sent Gmails will stay visible.
 
         text, markup = get_gen_30_interface(chat_id)
         bot.send_message(chat_id, text, reply_markup=markup)
@@ -169,7 +149,7 @@ def handle_text(message):
         wait_msg = bot.send_message(chat_id, "⏳ <b>Generating 10,000 Variants...</b>")
         variants = [generate_single_variant(message.text.strip()) for _ in range(10000)]
         file_buffer = io.BytesIO("\n".join(variants).encode('utf-8'))
-        file_buffer.name = "10k_variants_LOHIT.txt"
+        file_buffer.name = f"10K_{message.text.strip().split('@')[0]}.txt"
         
         bot.delete_message(chat_id, wait_msg.message_id)
         bot.send_document(chat_id, file_buffer, caption="✅ <b>Generation Complete!</b>\n🎯 By @Lohit_69")
