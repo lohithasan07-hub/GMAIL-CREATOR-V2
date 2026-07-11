@@ -115,52 +115,48 @@ def handle_callbacks(call):
         bot.edit_message_text(text, chat_id, call.message.message_id, reply_markup=markup)
 
     elif call.data.startswith("take_"):
-        state = user_data.get(chat_id)
+            state = user_data.get(chat_id)
+            if not state:
+                return # Silent exit if session is gone
 
-        if not state:
-            bot.answer_callback_query(call.id, "❌ Session expired")
-            return
-
-        # 🔒 LOCK (anti double click)
-        if state.get("busy"):
-            bot.answer_callback_query(call.id, "⏳ Wait...")
-            return
-        state["busy"] = True
-
-        try:
-            bot.answer_callback_query(call.id, "⚡ Sending...")
-            selected_mail = call.data.replace("take_", "")
-            current_base = state['email_list'][state['current_index']]
-            variants_list = state['variants_dict'][current_base]
-
-            # ❌ already removed
-            if selected_mail not in variants_list:
-                bot.answer_callback_query(call.id, "❌ Already taken")
-                state["busy"] = False
+            if state.get("busy"):
+                bot.answer_callback_query(call.id, "⏳ Please wait...", show_alert=True)
                 return
-            # 🧹 delete previous
-            if state.get('last_copy_id'):
-                try:
-                    bot.delete_message(chat_id, state['last_copy_id'])
-                except:
-                    pass
+            
+            state["busy"] = True
+            try:
+                selected_mail = call.data.replace("take_", "")
+                current_base = state['email_list'][state['current_index']]
+                variants_list = state['variants_dict'][current_base]
 
-            # ✅ SAFE REMOVE
-            variants_list.remove(selected_mail)
+                # 1. Perform checks BEFORE answering the callback
+                if selected_mail not in variants_list:
+                    bot.answer_callback_query(call.id, "❌ Already taken", show_alert=True)
+                    state["busy"] = False
+                    return
 
-            sent = bot.send_message(chat_id, f"<code>{selected_mail}</code>")
-            state['last_copy_id'] = sent.message_id
+                # 2. Now answer the callback exactly once
+                bot.answer_callback_query(call.id, "✅ Copied!")
 
-            # 🔄 UI refresh
-            text, markup = get_gen_30_interface(chat_id)
-            bot.edit_message_text(text, chat_id, call.message.message_id, reply_markup=markup)
+                # 3. Perform actions
+                if state.get('last_copy_id'):
+                    try:
+                        bot.delete_message(chat_id, state['last_copy_id'])
+                    except:
+                        pass
 
+                variants_list.remove(selected_mail)
+                sent = bot.send_message(chat_id, f"<code>{selected_mail}</code>")
+                state['last_copy_id'] = sent.message_id
 
-        except Exception as e:
-            bot.answer_callback_query(call.id, "❌ Error")
+                # 4. Refresh UI
+                text, markup = get_gen_30_interface(chat_id)
+                bot.edit_message_text(text, chat_id, call.message.message_id, reply_markup=markup)
 
-        finally:
-            state["busy"] = False
+            except Exception as e:
+                # Print the error to Railway logs so you can see why it fails
+                print(f"CRITICAL ERROR in take_ handler: {e}")
+                state["busy"] = False
       
 @bot.message_handler(func=lambda m: True)
 def handle_text(message):
@@ -210,15 +206,10 @@ def handle_text(message):
 
 if __name__ == "__main__":
     print("Bot is starting...")
-
+    # Add a global exception handler for the polling process
     while True:
         try:
-            bot.infinity_polling(
-                timeout=30,
-                long_polling_timeout=30,
-                skip_pending=True
-            )
-
+            bot.polling(none_stop=True, interval=0, timeout=60, long_polling_timeout=60)
         except Exception as e:
-            print(f"Error: {e}")
-            time.sleep(5)
+            print(f"Polling crashed: {e}")
+            time.sleep(5) # Wait 10 seconds before trying to reconnect to Telegram
