@@ -9,11 +9,11 @@ bot = telebot.TeleBot(API_TOKEN, parse_mode="HTML")
 
 user_data = {}
 
-# On-the-fly Generation (Memory Efficient)
+# অন-দ্য-ফ্লাই জেনারেশন ফাংশন (মেমরি সাশ্রয়ী)
 def generate_single_variant(email):
     try:
         local, domain = email.split("@")
-        domain = domain.lower()
+        domain = domain.lower()  # ডোমেইন সব সময় লোয়ারকেস থাকবে
         new_local = "".join(random.choice([c.lower(), c.upper()]) if c.isalpha() else c for c in local)
         return f"{new_local}@{domain}"
     except: return email
@@ -78,7 +78,7 @@ def handle_callbacks(call):
         user_data[chat_id] = {'mode': '30', 'email_list': []}
         bot.edit_message_text(
             "<blockquote>📨 <b>GMAIL GEN MODE (30)</b>\n\n"
-            "📝 একসাথে ১–১০টি জিমেইল পাঠান (Space দিয়ে আলাদা করে):</blockquote>", 
+            "📝 একসাথে ১–১০টি জিমেইল পাঠান (Space দিয়ে আলাদা করে):</blockquote>", 
             chat_id, call.message.message_id
         )
     
@@ -140,8 +140,6 @@ def handle_text(message):
         
         state.update({'email_list': emails, 'current_index': 0, 'last_msg_id': None})
         
-        # User message deletion removed! Your sent Gmails will stay visible.
-
         text, markup = get_gen_30_interface(chat_id)
         bot.send_message(chat_id, text, reply_markup=markup)
 
@@ -149,7 +147,10 @@ def handle_text(message):
         wait_msg = bot.send_message(chat_id, "⏳ <b>Generating 10,000 Variants...</b>")
         variants = [generate_single_variant(message.text.strip()) for _ in range(10000)]
         file_buffer = io.BytesIO("\n".join(variants).encode('utf-8'))
-        file_buffer.name = f"10K_{message.text.strip().split('@')[0]}.txt"
+        
+        # Dynamically name the file based on the target email
+        prefix = message.text.strip().split('@')[0]
+        file_buffer.name = f"10K_{prefix}.txt"
         
         bot.delete_message(chat_id, wait_msg.message_id)
         bot.send_document(chat_id, file_buffer, caption="✅ <b>Generation Complete!</b>\n🎯 By @Lohit_69")
