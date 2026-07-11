@@ -8,7 +8,7 @@ API_TOKEN = "8338478408:AAH1UbxlUs8s9ria4Xsfq3G2hDPwNtiDt5A"
 bot = telebot.TeleBot(API_TOKEN, parse_mode="HTML")
 
 # 🔴 REPLACE THIS WITH YOUR HOSTED HTML LINK (e.g., GitHub Pages URL)
-WEB_APP_URL = "https://yourusername.github.io/menu.html" 
+WEB_APP_URL = "https://lohithasan07-hub.github.io/lohithasan07.github.io/" 
 
 user_data = {}
 
